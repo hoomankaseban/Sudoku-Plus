@@ -1,0 +1,272 @@
+S = 9
+
+def get_box_number(row, col):
+    return 3 * (row // 3) + col // 3
+
+def bag_add(bag, num):
+    return bag | (1 << num)
+
+def bag_remove(bag, num):
+    return bag & ~(1 << num)
+
+def bag_check_exists(bag, num):
+    return (bag & (1 << num)) > 0
+
+def bag_all():
+    return ~0
+
+def bag_items_in_both(bag1, bag2):
+    return bag1 & bag2
+
+#مینیمم مقداری که باید به ازای این مقدار مشخص شده هر کیج برای هر سلول دریافت شود
+#به عنوان مثال فرض شود 3 کیج داریم 
+#حداقل مقداری که باید داشته باشد که شرایط محدودیت صدق کند
+#1+2+3
+def min_sum_in_n_cells(n):
+    return n * (n + 1) // 2
+#اینم حداکثر مقدار مقداره
+#برای کیج 3 تایی
+#9+8+7
+def max_sum_in_n_cells(n):
+    return (2 * S + 1 - n) * n // 2
+
+class Cell:
+    def __init__(self, name):
+        self.name = name
+        self.value = None
+        self.constraints = []
+
+    def add_constraint(self, constraint):
+        self.constraints.append(constraint)
+        constraint._attach_cell(self)
+
+    def set_value(self, val):
+        self.value = val
+        for c in self.constraints:
+            c._notify_value_set(self, val)
+
+    def unset_value(self, val):
+        self.value = None
+        for c in self.constraints:
+            c._notify_value_unset(self, val)
+
+    def get_available_options(self):
+        options = bag_all()
+        for c in self.constraints:
+            options = bag_items_in_both(options, c.get_available_for_cell(self))
+        return options
+
+    def get_count_of_options(self):
+        options = self.get_available_options()
+        result = 0
+        for num in range(1, S + 1):
+            if bag_check_exists(options, num):
+                result += 1
+        return result
+
+class UniquenessConstraint:
+    def __init__(self, name):
+        self.name = name
+        self.available = bag_all()
+        self.cells = []
+
+    def _attach_cell(self, cell):
+        self.cells.append(cell)
+
+    def _notify_value_set(self, cell, val):
+        self.available = bag_remove(self.available, val)
+
+    def _notify_value_unset(self, cell, val):
+        self.available = bag_add(self.available, val)
+
+    def get_available_for_cell(self, _cell):
+        return self.available
+
+class ExactSumUniquenessConstraint:#آپدیت کردن مقادیر ممکن براساس محدودیت کیج ها
+    def __init__(self, name, sum_value):
+        self.name = name
+        self.sum = sum_value
+        self.empty = 0 #تعداد سلول های فعال در محدودیت
+        self.available = bag_all()
+        self.cells = []
+
+    def _attach_cell(self, cell):
+        self.cells.append(cell)
+        self.empty += 1
+        # TODO: verify that cell is not set
+
+    def _notify_value_set(self, cell, val):
+        self.available = bag_remove(self.available, val)
+        self.sum -= val
+        self.empty -= 1#وقتی سلول مقدار دهی میشه انگار از کیج حذف میشه 
+
+    def _notify_value_unset(self, cell, val):
+        self.available = bag_add(self.available, val)
+        self.sum += val
+        self.empty += 1#وقتی مقدار دهی سلول برداشته میشه برمیگرده به کیج
+
+    def get_available_for_cell(self, _cell):
+        # TODO: assert empty >= 1
+        result = self.available
+        upper_bound = self.sum - min_sum_in_n_cells(self.empty - 1)
+        lower_bound = self.sum - max_sum_in_n_cells(self.empty - 1)
+        for i in range(1, lower_bound):
+            result = bag_remove(result, i)
+        for i in range(upper_bound + 1, S + 1):
+            result = bag_remove(result, i)
+        return result
+
+
+def show_board(cells):
+    print("======")
+    for row in range(9):
+        print(
+            ' '.join(str(cell.value) if cell.value is not None else '.' for cell in cells[row * 9: row * 9 + 9])
+        )
+
+def show_options(bag):
+    out = '['
+    for num in range(1, S + 1):
+        if bag_check_exists(bag, num):
+            out += str(num)
+    return out + ']'
+
+board = [
+    [8, 7, 1, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 8, 0],
+]
+
+killer_mask = [
+    'aaffqqtvv',
+    'aaaggqtww',
+    'bbhhpqttw',
+    'bcihprtuw',
+    'cciooruuu',
+    'dcijmrsux',
+    'ddjjmnssx',
+    'eeellnsxx',
+    'eekknnsyy',
+]
+
+killer_capacity = {
+    'a': 28, 'b': 16, 'c': 25, 'd': 13, 'e': 22, 'f': 3, 'g': 12,
+    'h': 16, 'i': 10, 'j': 18, 'k': 13, 'l': 4, 'm': 15, 'n': 22,
+    'o': 10, 'p': 5, 'q': 26, 'r': 12, 's': 17, 't': 29, 'u': 22,
+    'v': 13, 'w': 15, 'x': 28, 'y': 11,
+}
+
+class ConstraintSolver:
+    def __init__(self):
+        self.row_constraints = [UniquenessConstraint('r' + str(row)) for row in range(9)]
+        self.col_constraints = [UniquenessConstraint('c' + str(col)) for col in range(9)]
+        self.box_constraints = [UniquenessConstraint('b' + str(box)) for box in range(9)]
+        self.killer_constraints = {name: ExactSumUniquenessConstraint('k_' + name, value) for name, value in killer_capacity.items()}
+        self.cells = [Cell('(' + str(row) + ',' + str(col) + ')') for row in range(9) for col in range(9)]
+
+    def initialize_constraints(self):
+        for row in range(9):
+            for col in range(9):
+                i = row * 9 + col
+                cell = self.cells[i]
+                cell.add_constraint(self.row_constraints[row])
+                cell.add_constraint(self.col_constraints[col])
+                box = get_box_number(row, col)
+                cell.add_constraint(self.box_constraints[box])
+                killer_name = killer_mask[row][col]
+                if killer_name != '.':
+                    cell.add_constraint(self.killer_constraints[killer_name])
+
+    def set_initial_values(self):
+        for row in range(9):
+            for col in range(9):
+                if board[row][col] > 0:
+                    i = row * 9 + col
+                    self.cells[i].set_value(board[row][col])
+
+    def solve(self):
+        self.initialize_constraints()
+        self.set_initial_values()
+        #self.sequential_solver()
+        self.min_options_per_cell_solver()
+
+    def sequential_solver(self):#بدون هیوریستیک
+        def get_next_cell(row, col):
+            if col == 8:
+                return row + 1, 0
+            return row, col + 1
+
+        recursion_count = 0
+        highest_depth = 0
+
+        def backtracking(row, col, depth):
+            nonlocal recursion_count, highest_depth
+            recursion_count += 1
+            if row == 9:
+                show_board(self.cells)
+                return
+            if depth > highest_depth:
+                highest_depth = depth
+                show_board(self.cells)
+                print('depth', depth)
+            next_row, next_col = get_next_cell(row, col)
+            cell = self.cells[row * 9 + col]
+            if cell.value is not None:
+                backtracking(next_row, next_col, depth + 1)
+            else:
+                options = cell.get_available_options()
+                for num in range(1, S + 1):
+                    if bag_check_exists(options, num):
+                        cell.set_value(num)
+                        backtracking(next_row, next_col, depth + 1)
+                        cell.unset_value(num)
+
+        backtracking(0, 0, 0)
+        print('Recursion count', recursion_count)
+
+    def min_options_per_cell_solver(self):#LCv
+        recursion_count = 0
+        highest_depth = 0
+
+        def backtracking(depth):
+            nonlocal recursion_count, highest_depth
+            recursion_count += 1
+            pending_cells = [cell for cell in self.cells if cell.value is None]
+            if len(pending_cells) == 0:
+                show_board(self.cells)
+                return
+            if depth > highest_depth:
+                highest_depth = depth
+                show_board(self.cells)
+                print('depth', depth)
+            cell = pending_cells[0]
+            min_options_count = cell.get_count_of_options()
+            for i in range(1, len(pending_cells)):
+                count = pending_cells[i].get_count_of_options()
+                if count < min_options_count:
+                    min_options_count = count
+                    cell = pending_cells[i]
+            options = cell.get_available_options()
+            for num in range(1, S + 1):
+                if bag_check_exists(options, num):
+                    cell.set_value(num)
+                    backtracking(depth + 1)
+                    cell.unset_value(num)
+
+        backtracking(0)
+        print('Recursion count', recursion_count)
+
+
+if __name__ == "__main__":
+    solver = ConstraintSolver()
+    solver.solve()
+
+
+
+
