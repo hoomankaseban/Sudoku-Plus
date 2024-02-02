@@ -45,6 +45,7 @@ class Cell:
         self.value = val
         for c in self.constraints:
             c._notify_value_set(self, val)
+            self.forward_check(val)
 
     def unset_value(self, val):
         self.value = None
@@ -65,6 +66,10 @@ class Cell:
                 result += 1
         return result
 
+    def forward_check(self, val):
+        for c in self.constraints:
+            c._notify_forward_check(self, val)
+
 class UniquenessConstraint:
     def __init__(self, name):
         self.name = name
@@ -79,6 +84,9 @@ class UniquenessConstraint:
 
     def _notify_value_unset(self, cell, val):
         self.available = bag_add(self.available, val)
+
+    def _notify_forward_check(self, cell, val):
+        self.available = bag_remove(self.available, val)
 
     def get_available_for_cell(self, _cell):
         return self.available
@@ -105,6 +113,9 @@ class ExactSumUniquenessConstraint:#آپدیت کردن مقادیر ممکن ب
         self.available = bag_add(self.available, val)
         self.sum += val
         self.empty += 1#وقتی مقدار دهی سلول برداشته میشه برمیگرده به کیج
+
+    def _notify_forward_check(self, cell, val):
+        self.available = bag_remove(self.available, val)
 
     def get_available_for_cell(self, _cell):
         # TODO: assert empty >= 1
@@ -194,8 +205,8 @@ class ConstraintSolver:
     def solve(self):
         self.initialize_constraints()
         self.set_initial_values()
-        #self.sequential_solver()
-        self.min_options_per_cell_solver()
+        self.sequential_solver()
+        #self.min_options_per_cell_solver()
 
     def sequential_solver(self):#بدون هیوریستیک
         def get_next_cell(row, col):
