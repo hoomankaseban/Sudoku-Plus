@@ -1,5 +1,6 @@
 S = 9
 
+#
 def get_box_number(row, col):
     return 3 * (row // 3) + col // 3
 
@@ -229,8 +230,25 @@ class ConstraintSolver:
 
         backtracking(0, 0, 0)
         print('Recursion count', recursion_count)
+    
+    def least_constraining_value(self, cell):
+        options = cell.get_available_options()
+        constraints_count = []
 
-    def min_options_per_cell_solver(self):#LCv
+        for num in range(1, S + 1):
+            if bag_check_exists(options, num):
+                cell.set_value(num)
+                count = 0
+                for c in cell.constraints:
+                    count += len(c.cells)
+                constraints_count.append((num, count))
+                cell.unset_value(num)
+
+        # Sort options based on the number of constraints they impose on other cells
+        constraints_count.sort(key=lambda x: x[1])
+        return [num for num, _ in constraints_count]
+
+    def min_options_per_cell_solver(self):  # MRV + LCV
         recursion_count = 0
         highest_depth = 0
 
@@ -252,9 +270,11 @@ class ConstraintSolver:
                 if count < min_options_count:
                     min_options_count = count
                     cell = pending_cells[i]
-            options = cell.get_available_options()
-            for num in range(1, S + 1):
-                if bag_check_exists(options, num):
+
+            ordered_options = self.least_constraining_value(cell)
+
+            for num in ordered_options:
+                if bag_check_exists(cell.get_available_options(), num):
                     cell.set_value(num)
                     backtracking(depth + 1)
                     cell.unset_value(num)
