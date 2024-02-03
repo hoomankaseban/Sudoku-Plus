@@ -47,6 +47,7 @@ class Cell:#موارد مربوط به سلول ها
         self.value = val
         for c in self.constraints:
             c._notify_value_set(self, val)
+            self.forward_check(val)
 
     def unset_value(self, val):
         self.value = None
@@ -67,6 +68,10 @@ class Cell:#موارد مربوط به سلول ها
                 result += 1
         return result
 
+    def forward_check(self, val):
+        for c in self.constraints:
+            c._notify_forward_check(self, val)
+
 class SingleConstraint:#موارد مربوط به محدودیت های واحد غیر کیج
     def __init__(self, name):
         self.name = name
@@ -81,6 +86,10 @@ class SingleConstraint:#موارد مربوط به محدودیت های واح�
     #اضافه کردن مقدار حذف شده از سلول به مقادیر ممکن برای سلول
     def _notify_value_unset(self, cell, val):
         self.available = bag_add(self.available, val)
+
+    def _notify_forward_check(self, cell, val):
+        self.available = bag_remove(self.available, val)
+
     #لیست مقادیر ممکن برای سلول تحت این محدودیت خاص
     def get_available_for_cell(self, _cell):
         return self.available
@@ -107,6 +116,9 @@ class CageConstraint:#آپدیت کردن مقادیر ممکن براساس م�
         self.available = bag_add(self.available, val)
         self.sum += val
         self.active_cell += 1#وقتی مقدار دهی سلول برداشته میشه برمیگرده به کیج
+
+    def _notify_forward_check(self, cell, val):
+        self.available = bag_remove(self.available, val)
 
     def get_available_for_cell(self, _cell):
         # TODO: assert active_cell >= 1
