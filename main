@@ -1,9 +1,10 @@
 S = 9
 
-#
+#بدست آوردن شماره جعبه 3در3
 def get_box_number(row, col):
     return 3 * (row // 3) + col // 3
 
+#اعمال مربوط به مقادیر ممکن برای سلول
 def bag_add(bag, num):
     return bag | (1 << num)
 
@@ -15,7 +16,7 @@ def bag_check_exists(bag, num):
 
 def bag_all():
     return ~0
-
+# اشتراک بین دو لیست مقادیر ممکن برای سلول
 def bag_items_in_both(bag1, bag2):
     return bag1 & bag2
 
@@ -31,12 +32,13 @@ def min_sum_in_n_cells(n):
 def max_sum_in_n_cells(n):
     return (2 * S + 1 - n) * n // 2
 
-class Cell:
+
+class Cell:#موارد مربوط به سلول ها
     def __init__(self, name):
-        self.name = name
+        self.name = name #نام سلول
         self.value = None
         self.constraints = []
-
+    #اضافه کردن محدودیت به لیست محدودیت های سلول و اضافه کردن سلول به سلول های محدودیت
     def add_constraint(self, constraint):
         self.constraints.append(constraint)
         constraint._attach_cell(self)
@@ -45,13 +47,12 @@ class Cell:
         self.value = val
         for c in self.constraints:
             c._notify_value_set(self, val)
-            self.forward_check(val)
 
     def unset_value(self, val):
         self.value = None
         for c in self.constraints:
             c._notify_value_unset(self, val)
-
+    #لیست مقادیر ممکن برای سلول
     def get_available_options(self):
         options = bag_all()
         for c in self.constraints:
@@ -66,62 +67,52 @@ class Cell:
                 result += 1
         return result
 
-    def forward_check(self, val):
-        for c in self.constraints:
-            c._notify_forward_check(self, val)
-
-class UniquenessConstraint:
+class SingleConstraint:#موارد مربوط به محدودیت های واحد غیر کیج
     def __init__(self, name):
         self.name = name
         self.available = bag_all()
         self.cells = []
-
+    #اضافه کردن سلول به لیست سلول های مورد محدودیت 
     def _attach_cell(self, cell):
         self.cells.append(cell)
-
+    #حذف مقدار داده شده به سلول از لیست مقادیر ممکن برای آن سلول
     def _notify_value_set(self, cell, val):
         self.available = bag_remove(self.available, val)
-
+    #اضافه کردن مقدار حذف شده از سلول به مقادیر ممکن برای سلول
     def _notify_value_unset(self, cell, val):
         self.available = bag_add(self.available, val)
-
-    def _notify_forward_check(self, cell, val):
-        self.available = bag_remove(self.available, val)
-
+    #لیست مقادیر ممکن برای سلول تحت این محدودیت خاص
     def get_available_for_cell(self, _cell):
         return self.available
 
-class ExactSumUniquenessConstraint:#آپدیت کردن مقادیر ممکن براساس محدودیت کیج ها
+class CageConstraint:#آپدیت کردن مقادیر ممکن براساس محدودیت کیج ها
     def __init__(self, name, sum_value):
         self.name = name
         self.sum = sum_value
-        self.empty = 0 #تعداد سلول های فعال در محدودیت
+        self.active_cell = 0 #تعداد سلول های فعال در محدودیت
         self.available = bag_all()
         self.cells = []
 
     def _attach_cell(self, cell):
         self.cells.append(cell)
-        self.empty += 1
+        self.active_cell += 1
         # TODO: verify that cell is not set
 
     def _notify_value_set(self, cell, val):
         self.available = bag_remove(self.available, val)
         self.sum -= val
-        self.empty -= 1#وقتی سلول مقدار دهی میشه انگار از کیج حذف میشه 
+        self.active_cell -= 1#وقتی سلول مقدار دهی میشه انگار از کیج حذف میشه 
 
     def _notify_value_unset(self, cell, val):
         self.available = bag_add(self.available, val)
         self.sum += val
-        self.empty += 1#وقتی مقدار دهی سلول برداشته میشه برمیگرده به کیج
-
-    def _notify_forward_check(self, cell, val):
-        self.available = bag_remove(self.available, val)
+        self.active_cell += 1#وقتی مقدار دهی سلول برداشته میشه برمیگرده به کیج
 
     def get_available_for_cell(self, _cell):
-        # TODO: assert empty >= 1
+        # TODO: assert active_cell >= 1
         result = self.available
-        upper_bound = self.sum - min_sum_in_n_cells(self.empty - 1)
-        lower_bound = self.sum - max_sum_in_n_cells(self.empty - 1)
+        upper_bound = self.sum - min_sum_in_n_cells(self.active_cell - 1)
+        lower_bound = self.sum - max_sum_in_n_cells(self.active_cell - 1)
         for i in range(1, lower_bound):
             result = bag_remove(result, i)
         for i in range(upper_bound + 1, S + 1):
@@ -175,13 +166,14 @@ killer_capacity = {
 }
 
 class ConstraintSolver:
+    #ساخت پارامتر مربوط به هر محدودیت
     def __init__(self):
-        self.row_constraints = [UniquenessConstraint('r' + str(row)) for row in range(9)]
-        self.col_constraints = [UniquenessConstraint('c' + str(col)) for col in range(9)]
-        self.box_constraints = [UniquenessConstraint('b' + str(box)) for box in range(9)]
-        self.killer_constraints = {name: ExactSumUniquenessConstraint('k_' + name, value) for name, value in killer_capacity.items()}
+        self.row_constraints = [SingleConstraint('r' + str(row)) for row in range(9)]
+        self.col_constraints = [SingleConstraint('c' + str(col)) for col in range(9)]
+        self.box_constraints = [SingleConstraint('b' + str(box)) for box in range(9)]
+        self.killer_constraints = {name: CageConstraint('k_' + name, value) for name, value in killer_capacity.items()}
         self.cells = [Cell('(' + str(row) + ',' + str(col) + ')') for row in range(9) for col in range(9)]
-
+    #اضافه کردن محدودیت ها به کلاس محدودیت
     def initialize_constraints(self):
         for row in range(9):
             for col in range(9):
@@ -194,7 +186,7 @@ class ConstraintSolver:
                 killer_name = killer_mask[row][col]
                 if killer_name != '.':
                     cell.add_constraint(self.killer_constraints[killer_name])
-
+    #ساخت بٌرد ابتدایی که به عنوان صورت سوال است
     def set_initial_values(self):
         for row in range(9):
             for col in range(9):
@@ -202,13 +194,7 @@ class ConstraintSolver:
                     i = row * 9 + col
                     self.cells[i].set_value(board[row][col])
 
-    def solve(self):
-        self.initialize_constraints()
-        self.set_initial_values()
-        self.sequential_solver()
-        #self.min_options_per_cell_solver()
-
-    def sequential_solver(self):#بدون هیوریستیک
+    def sequential_solver(self):
         def get_next_cell(row, col):
             if col == 8:
                 return row + 1, 0
@@ -242,6 +228,7 @@ class ConstraintSolver:
         backtracking(0, 0, 0)
         print('Recursion count', recursion_count)
     
+    #تکنیک LCV
     def least_constraining_value(self, cell):
         options = cell.get_available_options()
         constraints_count = []
@@ -258,8 +245,8 @@ class ConstraintSolver:
         # Sort options based on the number of constraints they impose on other cells
         constraints_count.sort(key=lambda x: x[1])
         return [num for num, _ in constraints_count]
-
-    def min_options_per_cell_solver(self):  # MRV + LCV
+    #LCV + MRV + BACKTRACKING
+    def heuristic_solver(self):  
         recursion_count = 0
         highest_depth = 0
 
@@ -292,12 +279,14 @@ class ConstraintSolver:
 
         backtracking(0)
         print('Recursion count', recursion_count)
+   #حل مساله با استفاده از روش انتخابی
+    def solve(self):
+        self.initialize_constraints()
+        self.set_initial_values()
+        #self.sequential_solver()
+        self.heuristic_solver()
 
 
 if __name__ == "__main__":
     solver = ConstraintSolver()
     solver.solve()
-
-
-
-
