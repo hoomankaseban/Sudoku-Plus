@@ -1,8 +1,12 @@
-S = 9
+import string
+
+table_size = 9
 
 #بدست آوردن شماره جعبه 3در3
 def get_box_number(row, col):
     return 3 * (row // 3) + col // 3
+##نکته 
+#عملگر // در وافع محاسبه تقسیم به صورت صحیح است که گرد به پایین میکند
 
 #اعمال مربوط به مقادیر ممکن برای سلول
 def bag_add(bag, num):
@@ -24,13 +28,13 @@ def bag_items_in_both(bag1, bag2):
 #به عنوان مثال فرض شود 3 کیج داریم 
 #حداقل مقداری که باید داشته باشد که شرایط محدودیت صدق کند
 #1+2+3
-def min_sum_in_n_cells(n):
+def min_single_cell(n):
     return n * (n + 1) // 2
 #اینم حداکثر مقدار مقداره
 #برای کیج 3 تایی
 #9+8+7
-def max_sum_in_n_cells(n):
-    return (2 * S + 1 - n) * n // 2
+def max_single_cell(n):
+    return (2 * table_size + 1 - n) * n // 2
 
 
 class Cell:#موارد مربوط به سلول ها
@@ -41,36 +45,36 @@ class Cell:#موارد مربوط به سلول ها
     #اضافه کردن محدودیت به لیست محدودیت های سلول و اضافه کردن سلول به سلول های محدودیت
     def add_constraint(self, constraint):
         self.constraints.append(constraint)
-        constraint._attach_cell(self)
+        constraint.add_cell(self)
 
     def set_value(self, val):
         self.value = val
         for c in self.constraints:
-            c._notify_value_set(self, val)
+            c.update_value_set(self, val)
             self.forward_check(val)
 
     def unset_value(self, val):
         self.value = None
         for c in self.constraints:
-            c._notify_value_unset(self, val)
+            c.update_value_unset(self, val)
     #لیست مقادیر ممکن برای سلول
-    def get_available_options(self):
-        options = bag_all()
+    def get_available_choices(self):
+        choices = bag_all()
         for c in self.constraints:
-            options = bag_items_in_both(options, c.get_available_for_cell(self))
-        return options
+            choices = bag_items_in_both(choices, c.get_available_for_cell(self))
+        return choices
 
-    def get_count_of_options(self):
-        options = self.get_available_options()
+    def get_count_of_choices(self):
+        choices = self.get_available_choices()
         result = 0
-        for num in range(1, S + 1):
-            if bag_check_exists(options, num):
+        for num in range(1, table_size + 1):
+            if bag_check_exists(choices, num):
                 result += 1
         return result
 
     def forward_check(self, val):
         for c in self.constraints:
-            c._notify_forward_check(self, val)
+            c.update_forward_check(self, val)
 
 class SingleConstraint:#موارد مربوط به محدودیت های واحد غیر کیج
     def __init__(self, name):
@@ -78,16 +82,16 @@ class SingleConstraint:#موارد مربوط به محدودیت های واح�
         self.available = bag_all()
         self.cells = []
     #اضافه کردن سلول به لیست سلول های مورد محدودیت 
-    def _attach_cell(self, cell):
+    def add_cell(self, cell):
         self.cells.append(cell)
     #حذف مقدار داده شده به سلول از لیست مقادیر ممکن برای آن سلول
-    def _notify_value_set(self, cell, val):
+    def update_value_set(self, cell, val):
         self.available = bag_remove(self.available, val)
     #اضافه کردن مقدار حذف شده از سلول به مقادیر ممکن برای سلول
-    def _notify_value_unset(self, cell, val):
+    def update_value_unset(self, cell, val):
         self.available = bag_add(self.available, val)
 
-    def _notify_forward_check(self, cell, val):
+    def update_forward_check(self, cell, val):
         self.available = bag_remove(self.available, val)
 
     #لیست مقادیر ممکن برای سلول تحت این محدودیت خاص
@@ -102,32 +106,30 @@ class CageConstraint:#آپدیت کردن مقادیر ممکن براساس م�
         self.available = bag_all()
         self.cells = []
 
-    def _attach_cell(self, cell):
+    def add_cell(self, cell):
         self.cells.append(cell)
         self.active_cell += 1
-        # TODO: verify that cell is not set
 
-    def _notify_value_set(self, cell, val):
+    def update_value_set(self, cell, val):
         self.available = bag_remove(self.available, val)
         self.sum -= val
         self.active_cell -= 1#وقتی سلول مقدار دهی میشه انگار از کیج حذف میشه 
 
-    def _notify_value_unset(self, cell, val):
+    def update_value_unset(self, cell, val):
         self.available = bag_add(self.available, val)
         self.sum += val
         self.active_cell += 1#وقتی مقدار دهی سلول برداشته میشه برمیگرده به کیج
 
-    def _notify_forward_check(self, cell, val):
+    def update_forward_check(self, cell, val):
         self.available = bag_remove(self.available, val)
 
     def get_available_for_cell(self, _cell):
-        # TODO: assert active_cell >= 1
         result = self.available
-        upper_bound = self.sum - min_sum_in_n_cells(self.active_cell - 1)
-        lower_bound = self.sum - max_sum_in_n_cells(self.active_cell - 1)
+        upper_bound = self.sum - min_single_cell(self.active_cell - 1)
+        lower_bound = self.sum - max_single_cell(self.active_cell - 1)
         for i in range(1, lower_bound):
             result = bag_remove(result, i)
-        for i in range(upper_bound + 1, S + 1):
+        for i in range(upper_bound + 1, table_size + 1):
             result = bag_remove(result, i)
         return result
 
@@ -139,43 +141,6 @@ def show_board(cells):
             ' '.join(str(cell.value) if cell.value is not None else '.' for cell in cells[row * 9: row * 9 + 9])
         )
 
-def show_options(bag):
-    out = '['
-    for num in range(1, S + 1):
-        if bag_check_exists(bag, num):
-            out += str(num)
-    return out + ']'
-
-board = [
-    [8, 7, 1, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 8, 0],
-]
-
-killer_mask = [
-    'aaffqqtvv',
-    'aaaggqtww',
-    'bbhhpqttw',
-    'bcihprtuw',
-    'cciooruuu',
-    'dcijmrsux',
-    'ddjjmnssx',
-    'eeellnsxx',
-    'eekknnsyy',
-]
-
-killer_capacity = {
-    'a': 28, 'b': 16, 'c': 25, 'd': 13, 'e': 22, 'f': 3, 'g': 12,
-    'h': 16, 'i': 10, 'j': 18, 'k': 13, 'l': 4, 'm': 15, 'n': 22,
-    'o': 10, 'p': 5, 'q': 26, 'r': 12, 's': 17, 't': 29, 'u': 22,
-    'v': 13, 'w': 15, 'x': 28, 'y': 11,
-}
 
 class ConstraintSolver:
     #ساخت پارامتر مربوط به هر محدودیت
@@ -206,18 +171,18 @@ class ConstraintSolver:
                     i = row * 9 + col
                     self.cells[i].set_value(board[row][col])
 
-    def sequential_solver(self):
-        def get_next_cell(row, col):
+    def without_huristic(self):
+        def get_next(row, col):
             if col == 8:
                 return row + 1, 0
             return row, col + 1
 
-        recursion_count = 0
+        backtrack_count = 0
         highest_depth = 0
 
         def backtracking(row, col, depth):
-            nonlocal recursion_count, highest_depth
-            recursion_count += 1
+            nonlocal backtrack_count, highest_depth
+            backtrack_count += 1
             if row == 9:
                 show_board(self.cells)
                 return
@@ -225,28 +190,28 @@ class ConstraintSolver:
                 highest_depth = depth
                 show_board(self.cells)
                 print('depth', depth)
-            next_row, next_col = get_next_cell(row, col)
+            next_row, next_col = get_next(row, col)
             cell = self.cells[row * 9 + col]
             if cell.value is not None:
                 backtracking(next_row, next_col, depth + 1)
             else:
-                options = cell.get_available_options()
-                for num in range(1, S + 1):
-                    if bag_check_exists(options, num):
+                choices = cell.get_available_choices()
+                for num in range(1, table_size + 1):
+                    if bag_check_exists(choices, num):
                         cell.set_value(num)
                         backtracking(next_row, next_col, depth + 1)
                         cell.unset_value(num)
 
         backtracking(0, 0, 0)
-        print('Recursion count', recursion_count)
+        print('backtrack count', backtrack_count)
     
     #تکنیک LCV
     def least_constraining_value(self, cell):
-        options = cell.get_available_options()
+        choices = cell.get_available_choices()
         constraints_count = []
 
-        for num in range(1, S + 1):
-            if bag_check_exists(options, num):
+        for num in range(1, table_size + 1):
+            if bag_check_exists(choices, num):
                 cell.set_value(num)
                 count = 0
                 for c in cell.constraints:
@@ -254,17 +219,17 @@ class ConstraintSolver:
                 constraints_count.append((num, count))
                 cell.unset_value(num)
 
-        # Sort options based on the number of constraints they impose on other cells
+        # Sort choices based on the number of constraints they impose on other cells
         constraints_count.sort(key=lambda x: x[1])
         return [num for num, _ in constraints_count]
     #LCV + MRV + BACKTRACKING
     def heuristic_solver(self):  
-        recursion_count = 0
+        backtrack_count = 0
         highest_depth = 0
 
         def backtracking(depth):
-            nonlocal recursion_count, highest_depth
-            recursion_count += 1
+            nonlocal backtrack_count, highest_depth
+            backtrack_count += 1
             pending_cells = [cell for cell in self.cells if cell.value is None]
             if len(pending_cells) == 0:
                 show_board(self.cells)
@@ -274,31 +239,84 @@ class ConstraintSolver:
                 show_board(self.cells)
                 print('depth', depth)
             cell = pending_cells[0]
-            min_options_count = cell.get_count_of_options()
+            min_choices_count = cell.get_count_of_choices()
             for i in range(1, len(pending_cells)):
-                count = pending_cells[i].get_count_of_options()
-                if count < min_options_count:
-                    min_options_count = count
+                count = pending_cells[i].get_count_of_choices()
+                if count < min_choices_count:
+                    min_choices_count = count
                     cell = pending_cells[i]
 
-            ordered_options = self.least_constraining_value(cell)
+            ordered_choices = self.least_constraining_value(cell)
 
-            for num in ordered_options:
-                if bag_check_exists(cell.get_available_options(), num):
+            for num in ordered_choices:
+                if bag_check_exists(cell.get_available_choices(), num):
                     cell.set_value(num)
                     backtracking(depth + 1)
                     cell.unset_value(num)
 
         backtracking(0)
-        print('Recursion count', recursion_count)
+        print('backtrack count', backtrack_count)
+   
    #حل مساله با استفاده از روش انتخابی
-    def solve(self):
+    def without_huristic_solve(self):
         self.initialize_constraints()
         self.set_initial_values()
-        #self.sequential_solver()
+        self.without_huristic()
+
+    def with_huristic_solver(self):
+        self.initialize_constraints()
+        self.set_initial_values()
         self.heuristic_solver()
 
 
-if __name__ == "__main__":
-    solver = ConstraintSolver()
-    solver.solve()
+
+
+
+
+
+char=[]
+for a in string.printable:
+    if len(a)==1 and a!=' ':
+        char.append(a)
+char=char[10:]
+killer_mask = ['000000000'] * 9
+
+
+killer_capacity={}
+
+board = []
+ #گرفتن ورودی از کاربر برای سطرها
+for i in range(9):
+    row = input(f"Enter row {i + 1} (separate numbers by space): ")
+    board.append([int(cell) for cell in row.split()])
+
+
+#گرفتن ورودی از کاربر برای کیج ها
+rec=int(input('insert num of cages : '))
+for i in range(rec):
+    input_cage=input('cage : ')
+    numbers = [int(num) for num in input_cage.split() if num.isdigit()]
+    constrain_value=numbers[-1]
+    constrained_cells=numbers[:-1]
+    killer_capacity[char[i]]=int(constrain_value)
+    for cell in constrained_cells:
+        cell=str(cell)
+        row=int(cell[0])-1
+        col=int(cell[1])-1
+        
+        killer_mask_as_list = list(killer_mask[row])
+        killer_mask_as_list[col] = char[i]
+        killer_mask[row] = ''.join(killer_mask_as_list)
+
+
+
+
+
+
+solver = ConstraintSolver()
+#solver.without_huristic_solve()
+solver.with_huristic_solver()
+
+
+
+
