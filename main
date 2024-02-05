@@ -218,7 +218,7 @@ class ConstraintSolver:
                     count += len(c.cells)
                 constraints_count.append((num, count))
                 cell.unset_value(num)
-
+        # مرتب کردن گزینه ها بر اساس تعداد محدودیت هایی که شامل سلول های دیگر میشه
         # Sort choices based on the number of constraints they impose on other cells
         constraints_count.sort(key=lambda x: x[1])
         return [num for num, _ in constraints_count]
@@ -226,20 +226,26 @@ class ConstraintSolver:
     def heuristic_solver(self):  
         backtrack_count = 0
         highest_depth = 0
+        no_solution = True  # برای چک کردن وجود جواب
 
         def backtracking(depth):
-            nonlocal backtrack_count, highest_depth
+            nonlocal backtrack_count, highest_depth, no_solution
             backtrack_count += 1
             pending_cells = [cell for cell in self.cells if cell.value is None]
+            
             if len(pending_cells) == 0:
                 show_board(self.cells)
+                no_solution = False  # سودوکو حل شده
                 return
+            
             if depth > highest_depth:
                 highest_depth = depth
                 show_board(self.cells)
                 print('depth', depth)
+            
             cell = pending_cells[0]
             min_choices_count = cell.get_count_of_choices()
+            
             for i in range(1, len(pending_cells)):
                 count = pending_cells[i].get_count_of_choices()
                 if count < min_choices_count:
@@ -255,6 +261,10 @@ class ConstraintSolver:
                     cell.unset_value(num)
 
         backtracking(0)
+
+        if no_solution:
+            print("No solution found.")
+        
         print('backtrack count', backtrack_count)
    
    #حل مساله با استفاده از روش انتخابی
